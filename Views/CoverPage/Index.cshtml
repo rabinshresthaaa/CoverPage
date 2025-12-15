@@ -1,0 +1,28 @@
+﻿@model CoverPage.Models.CoverPageModel
+
+<h2>Lab Report Cover Page</h2>
+
+<form asp-action="Download" method="post">
+
+    <label>Subject Name</label>
+    <input asp-for="SubjectName" class="form-control" required />
+    <br />
+
+    <label>Student Name</label>
+    <input asp-for="StudentName" class="form-control" required />
+    <br />
+
+    <label>Roll Number</label>
+    <input asp-for="RollNumber" class="form-control" required />
+    <br />
+
+    <label>Submission Date</label>
+    <input asp-for="SubmissionDate" type="date" class="form-control" required />
+    <br />
+
+    <label>Teacher Name</label>
+    <input asp-for="TeacherName" class="form-control" required />
+    <br />
+
+    <button class="btn btn-success">Download DOC</button>
+</form>
