@@ -4,25 +4,16 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Mvc;
 using CoverPage.Helpers;
-using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.IO;
 
 namespace CoverPage.Controllers
 {
     public class CoverPageController : Controller
     {
-        public IActionResult Index()
-        {
-            return View();
-        }
+        public IActionResult Index() => View();
 
         [HttpPost]
         public IActionResult Download(CoverPageModel model)
-        {
-            return GenerateDoc(model);
-        }
-
-        private IActionResult GenerateDoc(CoverPageModel model)
         {
             using var stream = new MemoryStream();
 
@@ -33,64 +24,118 @@ namespace CoverPage.Controllers
             {
                 var mainPart = doc.AddMainDocumentPart();
                 mainPart.Document = new Document();
+                ApplyTimesNewRomanStyle(mainPart);
                 var body = mainPart.Document.AppendChild(new Body());
 
-                // A4 Page Setup
+                //PAGE SETUP
                 body.Append(new SectionProperties(
-                    new PageSize { Width = 11906, Height = 16838 },
-                    new PageMargin { Top = 1440, Bottom = 1440, Left = 1440, Right = 1440 }
+                    new PageSize
+                    {
+                        Width = 11906,   // A4
+                        Height = 16838
+                    },
+                    new PageMargin
+                    {
+                        Top = 1440,     // 1 inch
+                        Bottom = 1200,
+                        Left = 1440,
+                        Right = 1440
+                    }
                 ));
 
-                // UNIVERSITY HEADERS
-                body.Append(TightCenterText(new[]
-                {
-                    "TRIBHUVAN UNIVERSITY",
-                    "INSTITUTE OF SCIENCE AND TECHNOLOGY",
-                    "AMRIT SCIENCE CAMPUS"
-                }, 26, true));
+                // HEADER
+                body.Append(TightCenterLine("TRIBHUVAN UNIVERSITY", 26, true));
+                body.Append(TightCenterLine("INSTITUTE OF SCIENCE AND TECHNOLOGY", 20, true));
+                body.Append(TightCenterLine("AMRIT SCIENCE CAMPUS", 20, true));
 
+                AddImage(
+                    mainPart,
+                    body,
+                    "wwwroot/images/tu-logo.png",
+                    width: 200,
+                    height: 230
+                );
+                AddLineImage(mainPart, body);
 
-                body.Append(EmptyLine(1));
+                body.Append(SmallGap());
 
-                // LOGO
-                AddImage(mainPart, body);
+                // ================= SUBJECT (Shift+Enter) =================
+                body.Append(TightCenterText(
+                    new[] { model.SubjectName, "Lab Report" },
+                    22,
+                    true
+                ));
 
-                body.Append(EmptyLine(1));
-
-                // SUBJECT (USER INPUT)
-                body.Append(CenterText(model.SubjectName, 22, true));
-                body.Append(CenterText("Lab Report", 20, false));
-
-                body.Append(EmptyLine(1));
-
-                // SUBMITTED BY / TO
+                body.Append(SmallGap());
+                // ================= SUBMITTED =================
                 body.Append(CreateSubmittedTable(model));
 
-                body.Append(EmptyLine(1));
+                body.Append(SmallGap());
 
-                // SIGNATURES
+                // ================= SIGNATURES =================
                 body.Append(CreateSignatureTable());
             }
 
             return File(
                 stream.ToArray(),
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "LabReportCover.docx");
+                "LabReportCover.docx"
+            );
         }
 
-        Paragraph CenterText(string text, int size, bool bold)
+        //TEXT HELPERS
+        void ApplyTimesNewRomanStyle(MainDocumentPart mainPart)
+        {
+            var stylePart = mainPart.AddNewPart<StyleDefinitionsPart>();
+            stylePart.Styles = new Styles();
+
+            // Default "Normal" style
+            var normalStyle = new Style
+            {
+                Type = StyleValues.Paragraph,
+                StyleId = "Normal",
+                Default = true
+            };
+
+            normalStyle.Append(
+                new StyleName { Val = "Normal" },
+                new StyleRunProperties(
+                    new RunFonts
+                    {
+                        Ascii = "Times New Roman",
+                        HighAnsi = "Times New Roman",
+                        EastAsia = "Times New Roman",
+                        ComplexScript = "Times New Roman"
+                    },
+                    new FontSize { Val = "24" } // 12pt default
+                )
+            );
+
+            stylePart.Styles.Append(normalStyle);
+            stylePart.Styles.Save();
+        }
+        Paragraph TightCenterLine(string text, int fontSize, bool bold)
         {
             return new Paragraph(
                 new ParagraphProperties(
-                    new Justification { Val = JustificationValues.Center }),
+                    new Justification { Val = JustificationValues.Center },
+                    new SpacingBetweenLines
+                    {
+                        Before = "0",
+                        After = "0",
+                        Line = "220"
+                    }
+                ),
                 new Run(
                     new RunProperties(
-                        new Bold { Val = bold },
-                        new FontSize { Val = (size * 2).ToString() }),
+                        bold ? new Bold() : null,
+                        new FontSize { Val = (fontSize * 2).ToString() }
+                    ),
                     new Text(text)
                 )
             );
         }
+
         Paragraph TightCenterText(string[] lines, int fontSize, bool bold)
         {
             var run = new Run(
@@ -104,92 +149,160 @@ namespace CoverPage.Controllers
             {
                 run.Append(new Text(lines[i]));
                 if (i < lines.Length - 1)
-                    run.Append(new Break()); // Shift+Enter
+                    run.Append(new Break()); // Shift + Enter
             }
 
             return new Paragraph(
                 new ParagraphProperties(
-                    new Justification { Val = JustificationValues.Center }
+                    new Justification { Val = JustificationValues.Center },
+                    new SpacingBetweenLines
+                    {
+                        Before = "0",
+                        After = "0",
+                        Line = "220"
+                    }
                 ),
                 run
             );
         }
 
-        Paragraph EmptyLine(int count)
+        Paragraph InfoLine(string text, bool bold, bool underline = false, bool right = false)
         {
-            var p = new Paragraph();
-            for (int i = 0; i < count; i++)
-                p.Append(new Run(new Break()));
-            return p;
+            return new Paragraph(
+                new ParagraphProperties(
+                    right ? new Justification { Val = JustificationValues.Right } : null,
+                    new SpacingBetweenLines
+                    {
+                        Before = "0",
+                        After = "0",
+                        Line = "220"
+                    }
+                ),
+                new Run(
+                    new RunProperties(
+                        bold ? new Bold() : null,
+                        underline ? new Underline { Val = UnderlineValues.Single } : null
+                    ),
+                    new Text(text)
+                )
+            );
         }
+
+        Paragraph SmallGap()
+        {
+            return new Paragraph(
+                new ParagraphProperties(
+                    new SpacingBetweenLines
+                    {
+                        Before = "0",
+                        After = "0",
+                        Line = "160"
+                    }
+                ),
+                new Run(new Break())
+            );
+        }
+
+        // =====================================================
+        // ================= IMAGE HELPERS =====================
+        // =====================================================
+
+        // 🔥 FIXED: NO LINE SPACING (prevents clipping)
+        void AddImage(MainDocumentPart mainPart, Body body, string path, int width, int height)
+        {
+            var imagePart = mainPart.AddImagePart(ImagePartType.Png);
+            using var stream = System.IO.File.OpenRead(path);
+            imagePart.FeedData(stream);
+
+            var drawing = ImageHelper.CreateImageDrawing(
+                mainPart.GetIdOfPart(imagePart),
+                width,
+                height
+            );
+
+            body.Append(
+                new Paragraph(
+                    new ParagraphProperties(
+                        new Justification { Val = JustificationValues.Center },
+                        new SpacingBetweenLines
+                        {
+                            Before = "200",
+                            After = "200"
+                        }
+                    ),
+                    new Run(drawing)
+                )
+            );
+        }
+
+        void AddLineImage(MainDocumentPart mainPart, Body body)
+        {
+            var imagePart = mainPart.AddImagePart(ImagePartType.Png);
+            using var stream = System.IO.File.OpenRead("wwwroot/images/line.png");
+            imagePart.FeedData(stream);
+
+            var drawing = ImageHelper.CreateImageDrawing(
+                mainPart.GetIdOfPart(imagePart),
+                100,
+                280
+            );
+
+            body.Append(
+                new Paragraph(
+                    new ParagraphProperties(
+                        new Justification { Val = JustificationValues.Center },
+                        new SpacingBetweenLines
+                        {
+                            Before = "160",
+                            After = "160"
+                        }
+                    ),
+                    new Run(drawing)
+                )
+            );
+        }
+
+        // =====================================================
+        // ================= TABLES ============================
+        // =====================================================
 
         Table CreateSubmittedTable(CoverPageModel model)
         {
-            Table table = new Table();
-
-            // Make table full width
-            table.AppendChild(new TableProperties(
-                new TableWidth { Width = "100%", Type = TableWidthUnitValues.Pct }
-            ));
+            Table table = new Table(
+                new TableProperties(
+                    new TableWidth { Width = "100%", Type = TableWidthUnitValues.Pct }
+                )
+            );
 
             TableRow row = new TableRow();
 
-            // LEFT CELL
             row.Append(new TableCell(
-                new TableCellProperties(
-                    new TableCellWidth { Width = "50%", Type = TableWidthUnitValues.Pct }
-                ),
-                new Paragraph(
-                    new Run(new RunProperties(new Bold()), new Text("SUBMITTED BY:"))
-                ),
-                new Paragraph(new Run(new Text($"Name: {model.StudentName}"))),
-                new Paragraph(new Run(new Text($"Roll: {model.RollNumber}"))),
-                new Paragraph(new Run(new Text($"Date: {model.SubmissionDate:yyyy/MM/dd}")))
+                InfoLine("SUBMITTED BY:", true, true),
+                InfoLine($"Name: {model.StudentName}", true),
+                InfoLine($"Roll: {model.RollNumber}", true),
+                InfoLine($"Date: {model.SubmissionDate:yyyy/MM/dd}", true)
             ));
 
-            // RIGHT CELL
             row.Append(new TableCell(
-                new TableCellProperties(
-                    new TableCellWidth { Width = "50%", Type = TableWidthUnitValues.Pct }
-                ),
-                new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Right }
-                    ),
-                    new Run(new RunProperties(new Bold()), new Text("SUBMITTED TO:"))
-                ),
-                new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Right }
-                    ),
-                    new Run(new Text(model.TeacherName))
-                ),
-                new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Right }
-                    ),
-                    new Run(new Text("Department of CSIT"))
-                )
+                InfoLine("SUBMITTED TO:", true, true, true),
+                InfoLine(model.TeacherName, true, true, true),
+                InfoLine("Department of CSIT", true, false, true)
             ));
 
             table.Append(row);
             return table;
         }
 
-
         Table CreateSignatureTable()
         {
-            Table table = new Table();
-
-            table.AppendChild(new TableProperties(
-                new TableWidth { Width = "100%", Type = TableWidthUnitValues.Pct },
-                new TableLook { Val = "04A0" }
-            ));
+            Table table = new Table(
+                new TableProperties(
+                    new TableWidth { Width = "100%", Type = TableWidthUnitValues.Pct }
+                )
+            );
 
             TableRow row = new TableRow(
-                new TableRowProperties(
-                    new CantSplit() // 🔥 prevents page break
-                )
+                new TableRowProperties(new CantSplit())
             );
 
             row.Append(new TableCell(
@@ -199,15 +312,11 @@ namespace CoverPage.Controllers
 
             row.Append(new TableCell(
                 new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Right }
-                    ),
+                    new ParagraphProperties(new Justification { Val = JustificationValues.Right }),
                     new Run(new Text("__________________________"))
                 ),
                 new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Right }
-                    ),
+                    new ParagraphProperties(new Justification { Val = JustificationValues.Right }),
                     new Run(new Text("Internal Teacher's Signature"))
                 )
             ));
@@ -215,24 +324,5 @@ namespace CoverPage.Controllers
             table.Append(row);
             return table;
         }
-
-
-        void AddImage(MainDocumentPart mainPart, Body body)
-        {
-            var imagePart = mainPart.AddImagePart(ImagePartType.Png);
-
-            using var stream = System.IO.File.OpenRead("wwwroot/images/tu-logo.png");
-            imagePart.FeedData(stream);
-
-            var drawing = ImageHelper.CreateImageDrawing(
-                mainPart.GetIdOfPart(imagePart), 200, 200);
-
-            body.Append(new Paragraph(
-                new ParagraphProperties(
-                    new Justification { Val = JustificationValues.Center }),
-                new Run(drawing)
-            ));
-        }
-
     }
 }
