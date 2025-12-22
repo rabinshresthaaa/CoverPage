@@ -59,7 +59,7 @@ namespace CoverPage.Controllers
 
                 body.Append(SmallGap());
 
-                // ================= SUBJECT (Shift+Enter) =================
+                // SUBJECT
                 body.Append(TightCenterText(
                     new[] { model.SubjectName, "Lab Report" },
                     22,
@@ -67,12 +67,12 @@ namespace CoverPage.Controllers
                 ));
 
                 body.Append(SmallGap());
-                // ================= SUBMITTED =================
+                // SUBMITTED
                 body.Append(CreateSubmittedTable(model));
 
                 body.Append(SmallGap());
 
-                // ================= SIGNATURES =================
+                // SIGNATURES
                 body.Append(CreateSignatureTable());
             }
 
@@ -203,11 +203,7 @@ namespace CoverPage.Controllers
             );
         }
 
-        // =====================================================
-        // ================= IMAGE HELPERS =====================
-        // =====================================================
-
-        // 🔥 FIXED: NO LINE SPACING (prevents clipping)
+        // IMAGE HELPERS 
         void AddImage(MainDocumentPart mainPart, Body body, string path, int width, int height)
         {
             var imagePart = mainPart.AddImagePart(ImagePartType.Png);
@@ -262,9 +258,8 @@ namespace CoverPage.Controllers
             );
         }
 
-        // =====================================================
-        // ================= TABLES ============================
-        // =====================================================
+        // TABLES
+       
 
         Table CreateSubmittedTable(CoverPageModel model)
         {
